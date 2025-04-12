@@ -10,6 +10,10 @@ repositories {
     mavenCentral()
 }
 
+application {
+    mainClass = "ar.edu.itba.ss.MainKt"
+}
+
 dependencies {
     // Clickt for CLI parsing
     implementation("com.github.ajalt.clikt:clikt:5.0.1")

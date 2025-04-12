@@ -70,5 +70,21 @@ class Cli : CliktCommand() {
         logger.info { "Enable internal collisions: $enableInternalCollisions" }
         logger.info { "Seed: $seed" }
         logger.info { "Output directory: $outputDirectory" }
+
+        val generatorSettings = GeneratorSettings(
+            numberOfParticles = numberOfParticles,
+            radius = radius,
+            mass = mass,
+            initialVelocity = initialVelocity,
+            seed = seed,
+            obstacleRadius = 0.005,
+            containerRadius = 0.05
+        )
+
+        val particles = ParticleGenerator(generatorSettings).generate()
+
+        //particles.forEach { particle ->
+        //    logger.info { "Particle: $particle" }
+        //}
     }
 }

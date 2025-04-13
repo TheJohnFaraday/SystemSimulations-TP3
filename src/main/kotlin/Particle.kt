@@ -17,7 +17,7 @@ data class Particle(
 ) {
     companion object {
         fun randomVelocities(v0: Double, random: Random): Pair<Double, Double> {
-            // v0 is the initial module of the velocities. We need to generate vn and vt
+            // v0 is the initial module of the velocities. We need to generate vx and vy
             val angle = random.nextDouble() * 2 * Math.PI
             val vx = v0 * cos(angle)
             val vy = v0 * sin(angle)
@@ -44,6 +44,13 @@ data class Particle(
 
             return p.copy(vx = vx, vy = vy)
         }
+    }
+
+    fun advance(dt: Double): Particle {
+        return this.copy(
+            x = x + vx * dt,
+            y = y + vy * dt
+        )
     }
 
     fun toVnVt(): Pair<Double, Double> {

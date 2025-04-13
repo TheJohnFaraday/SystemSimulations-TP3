@@ -44,8 +44,8 @@ class Simulation {
             val dt = event.time - currentTime
             currentTime = event.time
 
-            /* Advance all the particles */
-            // particleMap.replaceAll { _, p -> p.advanceTo(currentTime - dt, currentTime) }
+            /* Advance all the particles (only position)*/
+            particleMap.replaceAll { _, p -> p.advance(dt) }
 
             for (p in particleMap.values) {
                 // Save state

@@ -9,12 +9,12 @@ class ParticleGenerator(
     private val settings: GeneratorSettings
 ) {
 
-    fun generate(): List<Particle> {
+    fun generate(): Map<Int, Particle> {
         val random = Random(settings.seed)
         val obstacleRadius = settings.obstacleRadius
         val containerRadius = settings.containerRadius
         val particleRadius = settings.radius
-        val particles = mutableListOf<Particle>()
+        val particles = mutableMapOf<Int, Particle>()
 
         repeat(settings.numberOfParticles){ id ->
             var x: Double
@@ -33,15 +33,14 @@ class ParticleGenerator(
                 insideObstacle = sqrt(x * x + y * y) < (obstacleRadius + particleRadius)
                 insideContainer = sqrt(x * x + y * y) < (containerRadius - particleRadius)
 
-                overlapping = particles.any {
+                overlapping = particles.values.any {
                     Particle.areOverlapping(it, Particle(id, particleRadius, settings.mass, x, y, 0.0, 0.0))
                 }
 
             } while (overlapping || insideObstacle || !insideContainer)
 
-            val (vn, vt) = Particle.randomVelocities(settings.initialVelocity, random)
-            val p = Particle(id, particleRadius, settings.mass, x, y, vn, vt)
-            particles.add(p)
+            val (vx, vy) = Particle.randomVelocities(settings.initialVelocity, random)
+            particles[id] = Particle(id, particleRadius, settings.mass, x, y, vx, vy)
         }
 
         return particles

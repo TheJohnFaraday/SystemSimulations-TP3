@@ -82,9 +82,5 @@ class Cli : CliktCommand() {
         )
 
         val particles = ParticleGenerator(generatorSettings).generate()
-
-        //particles.forEach { particle ->
-        //    logger.info { "Particle: $particle" }
-        //}
     }
 }

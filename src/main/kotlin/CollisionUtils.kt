@@ -40,5 +40,37 @@ object CollisionUtils {
 
         return -(dvdr + sqrt(d)) / dvdv
     }
+
+    /* We only change the sign of the normal */
+    fun reflectNormal(p: Particle): Particle {
+        val (vn, vt) = p.toVnVt()
+        return Particle.fromVnVt(p, -vn, vt).copy(collisionCount = p.collisionCount + 1)
+    }
+
+    fun resolveParticleCollision(p1: Particle, p2: Particle): Pair<Particle, Particle> {
+        val dx = p2.x - p1.x
+        val dy = p2.y - p1.y
+        val dvx = p2.vx - p1.vx
+        val dvy = p2.vy - p1.vy
+        val dvdr = dx * dvx + dy * dvy
+        val dist = p1.radius + p2.radius
+
+        val j = 2 * p1.mass * p2.mass * dvdr / ((p1.mass + p2.mass) * dist)
+        val jx = j * dx / dist
+        val jy = j * dy / dist
+
+        val newP1 = p1.copy(
+            vx = p1.vx + jx / p1.mass,
+            vy = p1.vy + jy / p1.mass,
+            collisionCount = p1.collisionCount + 1
+        )
+        val newP2 = p2.copy(
+            vx = p2.vx - jx / p2.mass,
+            vy = p2.vy - jy / p2.mass,
+            collisionCount = p2.collisionCount + 1
+        )
+
+        return Pair(newP1, newP2)
+    }
 }
 

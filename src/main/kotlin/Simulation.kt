@@ -14,24 +14,16 @@ class Simulation {
         var currentTime = 0.0
         /* The priority queue has the lowest t values first */
         val eventQueue = PriorityQueue<CollisionEvent>()
-        /* The mutableSet avoid add to the queue a duplicate event*/
-        val scheduledEvents = mutableSetOf<Pair<Int, CollisionType>>()
         val particleMap = particles.toMutableMap()
-
-        fun scheduleEvent(time: Double, particle: Particle, type: CollisionType) {
-            val key = particle.id to type
-            if (key !in scheduledEvents) {
-                scheduledEvents.add(key)
-                eventQueue.add(CollisionEvent(time, particle, type))
-            }
-        }
 
         // First events
         for (p in particleMap.values) {
             val tWall = CollisionUtils.timeToWallCollision(p, containerRadius)
             val tObstacle = CollisionUtils.timeToObstacleCollision(p, obstacleRadius)
-            if (tWall.isFinite()) scheduleEvent(currentTime + tWall, p, CollisionType.WALL)
-            if (tObstacle.isFinite()) scheduleEvent(currentTime + tObstacle, p, CollisionType.OBSTACLE)
+            if (tWall.isFinite()) eventQueue.add(CollisionEvent(currentTime + tWall, p,
+                CollisionType.WALL, p.collisionCount))
+            if (tObstacle.isFinite()) eventQueue.add(CollisionEvent(currentTime + tObstacle, p,
+                CollisionType.OBSTACLE, p.collisionCount))
         }
 
         val writer = outputCsv.bufferedWriter()
@@ -39,7 +31,13 @@ class Simulation {
 
         while (eventQueue.isNotEmpty() && currentTime < finalTime) {
             val event = eventQueue.poll()
-            scheduledEvents.remove(event.particle.id to event.type)
+
+            val particle = particleMap[event.particle.id]!!
+
+            // Check if is a valid event
+            if (event.collisionCount != particle.collisionCount) {
+                continue
+            }
 
             val dt = event.time - currentTime
             currentTime = event.time
@@ -63,8 +61,10 @@ class Simulation {
             // Recalculate collisions
             val tWall = CollisionUtils.timeToWallCollision(updatedParticle, containerRadius)
             val tObstacle = CollisionUtils.timeToObstacleCollision(updatedParticle, obstacleRadius)
-            if (tWall.isFinite()) scheduleEvent(currentTime + tWall, updatedParticle, CollisionType.WALL)
-            if (tObstacle.isFinite()) scheduleEvent(currentTime + tObstacle, updatedParticle, CollisionType.OBSTACLE)
+            if (tWall.isFinite()) eventQueue.add(CollisionEvent(currentTime + tWall, updatedParticle,
+                CollisionType.WALL, updatedParticle.collisionCount))
+            if (tObstacle.isFinite()) eventQueue.add(CollisionEvent(currentTime + tObstacle, updatedParticle,
+                CollisionType.OBSTACLE, updatedParticle.collisionCount))
         }
 
         writer.close()
@@ -74,6 +74,6 @@ class Simulation {
     /* We only change the sign of the normal */
     private fun reflectNormal(p: Particle): Particle {
         val (vn, vt) = p.toVnVt()
-        return Particle.fromVnVt(p, -vn, vt)
+        return Particle.fromVnVt(p, -vn, vt).copy(collisionCount = p.collisionCount + 1)
     }
 }

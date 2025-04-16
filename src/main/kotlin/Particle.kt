@@ -13,7 +13,8 @@ data class Particle(
     val x: Double,
     val y: Double,
     val vx: Double,
-    val vy: Double
+    val vy: Double,
+    val collisionCount: Int = 0
 ) {
     companion object {
         fun randomVelocities(v0: Double, random: Random): Pair<Double, Double> {

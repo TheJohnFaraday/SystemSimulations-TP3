@@ -5,9 +5,8 @@
 # radius=0.0005               # Default: 0.0005 m
 # mass=1.0                    # Default: 1.0 kg
 # initial_velocity=1.0        # Default: 1.0 m/s
-final_time=10.0               # No default, required
+final_time=5.0               # No default, required
 output_directory=./output     # Required
-# enable_internal_collisions=false  # Default: false
 seed=1743645648280            # Optional, for reproducibility
 
 # Clear the terminal

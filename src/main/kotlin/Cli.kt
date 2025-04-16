@@ -82,5 +82,29 @@ class Cli : CliktCommand() {
         )
 
         val particles = ParticleGenerator(generatorSettings).generate()
+
+        val fileName = buildString {
+            append("particles=$numberOfParticles")
+            append("-radius=$radius")
+            append("-mass=$mass")
+            append("-v0=$initialVelocity")
+            append("-t=$finalTime")
+            append("-internalCollisions=$enableInternalCollisions")
+            append("-seed=$seed")
+        }.replace(".", "_") + ".csv"
+
+        val outputCsv = outputDirectory.resolve(fileName).toFile()
+
+        val simulation = Simulation()
+        simulation.simulate(
+            particles = particles,
+            finalTime = finalTime!!,
+            containerRadius = generatorSettings.containerRadius,
+            obstacleRadius = generatorSettings.obstacleRadius,
+            outputCsv = outputCsv,
+            enableInternalCollisions = enableInternalCollisions
+        )
+
+        logger.info { "Simulation completed. Output saved to $outputCsv" }
     }
 }

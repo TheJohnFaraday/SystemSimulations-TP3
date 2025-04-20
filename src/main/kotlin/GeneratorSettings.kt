@@ -1,8 +1,9 @@
 package ar.edu.itba.ss
 
-import java.nio.file.Path
+import kotlin.random.Random
 
 data class GeneratorSettings(
+    val random: Random,
     // Params
     val numberOfParticles: Int,
     val radius: Double,

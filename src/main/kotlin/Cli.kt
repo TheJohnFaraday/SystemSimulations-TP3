@@ -7,11 +7,15 @@ import com.github.ajalt.clikt.parameters.types.int
 import com.github.ajalt.clikt.parameters.types.long
 import com.github.ajalt.clikt.parameters.types.path
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import java.nio.file.Path
+import kotlin.random.Random
 
 class Cli : CliktCommand() {
 
-    private val logger = KotlinLogging.logger{}
+    private val logger = KotlinLogging.logger {}
 
     private val numberOfParticles: Int by option("-N", "--number-of-particles")
         .int()
@@ -37,8 +41,9 @@ class Cli : CliktCommand() {
         .help("Initial velocity of the particles [m/s]")
         .check("Must be non-negative") { it >= 0.0 }
 
-    private val finalTime: Double? by option("-t", "--t-final")
+    private val finalTime: Double by option("-t", "--simulation-time")
         .double()
+        .required()
         .help("Total simulation time")
         .check("Must be greater than 0") { it > 0.0 }
 
@@ -71,7 +76,20 @@ class Cli : CliktCommand() {
         logger.info { "Seed: $seed" }
         logger.info { "Output directory: $outputDirectory" }
 
+        val fileName = buildString {
+            append("particles=$numberOfParticles")
+            append("_radius=$radius")
+            append("_mass=$mass")
+            append("_v0=$initialVelocity")
+            append("_t=$finalTime")
+            append("_internalCollisions=$enableInternalCollisions")
+            append("_seed=$seed")
+        }.replace(".", "_").replace("=", "-") + ".csv"
+
+        val outputCsv = outputDirectory.resolve(fileName).toFile()
+
         val generatorSettings = GeneratorSettings(
+            random = Random(seed),
             numberOfParticles = numberOfParticles,
             radius = radius,
             mass = mass,
@@ -80,31 +98,31 @@ class Cli : CliktCommand() {
             obstacleRadius = 0.005,
             containerRadius = 0.05
         )
-
-        val particles = ParticleGenerator(generatorSettings).generate()
-
-        val fileName = buildString {
-            append("particles=$numberOfParticles")
-            append("-radius=$radius")
-            append("-mass=$mass")
-            append("-v0=$initialVelocity")
-            append("-t=$finalTime")
-            append("-internalCollisions=$enableInternalCollisions")
-            append("-seed=$seed")
-        }.replace(".", "_") + ".csv"
-
-        val outputCsv = outputDirectory.resolve(fileName).toFile()
-
-        val simulation = Simulation()
-        simulation.simulate(
-            particles = particles,
-            finalTime = finalTime!!,
-            containerRadius = generatorSettings.containerRadius,
-            obstacleRadius = generatorSettings.obstacleRadius,
-            outputCsv = outputCsv,
-            enableInternalCollisions = enableInternalCollisions
+        val settings = Settings(
+            generatorSettings = generatorSettings,
+            outputFile = outputCsv,
+            particles = ParticleGenerator(generatorSettings).generate(),
+            finalTime = finalTime,
+            internalCollisions = enableInternalCollisions
         )
 
-        logger.info { "Simulation completed. Output saved to $outputCsv" }
+        runBlocking {
+            val writeOutputChannel = Channel<String>(capacity = Channel.UNLIMITED)
+            val writer = OutputWriter(settings = settings, channel = writeOutputChannel)
+            val simulation = Simulation(settings, outputChannel = writeOutputChannel)
+
+            val writerJob = launch { writer.start() }
+            val simulationJob = launch { simulation.simulate() }
+
+            simulationJob.join()
+            logger.info { "Simulation finished. Waiting for writer to finish.)" }
+
+            writer.requestStop()
+            writerJob.join()
+            writeOutputChannel.close()
+
+            logger.info { "Simulation completed. Output saved to $outputCsv" }
+        }
+
     }
 }

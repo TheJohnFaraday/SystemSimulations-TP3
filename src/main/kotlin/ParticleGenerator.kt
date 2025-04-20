@@ -3,20 +3,18 @@ package ar.edu.itba.ss
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
-import kotlin.random.Random
 
 class ParticleGenerator(
     private val settings: GeneratorSettings
 ) {
 
     fun generate(): Map<Int, Particle> {
-        val random = Random(settings.seed)
         val obstacleRadius = settings.obstacleRadius
         val containerRadius = settings.containerRadius
         val particleRadius = settings.radius
         val particles = mutableMapOf<Int, Particle>()
 
-        repeat(settings.numberOfParticles){ id ->
+        repeat(settings.numberOfParticles) { id ->
             var x: Double
             var y: Double
             var overlapping: Boolean
@@ -24,8 +22,8 @@ class ParticleGenerator(
             var insideContainer: Boolean
 
             do {
-                val angle = random.nextDouble() * 2 * Math.PI
-                val r = obstacleRadius + particleRadius + random.nextDouble() * (containerRadius - obstacleRadius - 2 * particleRadius)
+                val angle = settings.random.nextDouble() * 2 * Math.PI
+                val r = obstacleRadius + particleRadius + settings.random.nextDouble() * (containerRadius - obstacleRadius - 2 * particleRadius)
 
                 x = r * cos(angle)
                 y = r * sin(angle)
@@ -39,7 +37,7 @@ class ParticleGenerator(
 
             } while (overlapping || insideObstacle || !insideContainer)
 
-            val (vx, vy) = Particle.randomVelocities(settings.initialVelocity, random)
+            val (vx, vy) = Particle.randomVelocities(settings.initialVelocity, settings.random)
             particles[id] = Particle(id, particleRadius, settings.mass, x, y, vx, vy)
         }
 

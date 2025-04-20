@@ -7,5 +7,6 @@ data class Settings(
     val generatorSettings: GeneratorSettings,
     val particles: Map<Int, Particle>,
     val finalTime: Double,
-    val internalCollisions: Boolean
+    val internalCollisions: Boolean,
+    val eventDensity: Int?
 )

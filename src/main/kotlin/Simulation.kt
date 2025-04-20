@@ -6,6 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.withContext
 import java.util.*
+import kotlin.time.measureTime
 
 class Simulation(
     private val settings: Settings,
@@ -15,19 +16,12 @@ class Simulation(
     private val logger = KotlinLogging.logger {}
 
     private var currentTime = 0.0
+    private var eventsCounter = 0
 
     /* The priority queue has the lowest t values first */
     private val eventQueue = PriorityQueue<CollisionEvent>()
     private val particleMap = settings.particles.toMutableMap();
     private val eventsProcessor = CollisionProcessor(settings, eventQueue, particleMap)
-
-    private fun processInitialEvents() = particleMap.forEach { (_, particle) ->
-        eventsProcessor.processObstaclesCollision(particle, currentTime)
-        // Collisions with particles
-        if (settings.internalCollisions) {
-            eventsProcessor.processParticlesCollision(particle, currentTime)
-        }
-    }
 
     suspend fun simulate() = withContext(dispatcher) {
         outputChannel.send("time,id,x,y,vx,vy\n")
@@ -41,42 +35,68 @@ class Simulation(
             val p1 = particleMap[event.particle.id] ?: continue
 
             // check if is a valid event
-            if (event.type == CollisionType.PARTICLE) {
-                val p2 = particleMap[event.other?.id] ?: continue
-                if (event.collisionCount != p1.collisionCount || event.otherCollisionCount != p2.collisionCount) {
-                    continue
-                }
-            } else {
-                if (event.collisionCount != p1.collisionCount) continue
-            }
+            if (!isValidEvent(p1, event)) continue
 
             val dt = event.time - currentTime
             currentTime = event.time
-
             // Advance all the particles (only position)
             particleMap.replaceAll { _, p -> p.advance(dt) }
-
-            // Save state
-            particleMap.values.forEach { p ->
-                outputChannel.send(
-                    "${
-                        "%.6f".format(currentTime)
-                    },${p.id},${
-                        "%.8f".format(p.x)
-                    },${
-                        "%.8f".format(p.y)
-                    },${
-                        "%.8f".format(p.vx)
-                    },${
-                        "%.8f".format(p.vy)
-                    }\n"
-                )
-            }
-
+            // Save current state to file
+            saveState(event.time)
             // Next step
             eventsProcessor.process(p1, event, currentTime)
         }
 
         logger.info { "Finished" }
+    }
+
+    private fun isValidEvent(p1: Particle, event: CollisionEvent): Boolean =
+        if (event.type == CollisionType.PARTICLE) {
+            val p2 = particleMap[event.other?.id]
+            !(event.collisionCount != p1.collisionCount
+                    || p2 == null
+                    || event.otherCollisionCount != p2.collisionCount)
+        } else if (event.collisionCount != p1.collisionCount) {
+            false
+        } else {
+            true
+        }
+
+
+    private fun processInitialEvents() = particleMap.forEach { (_, particle) ->
+        eventsProcessor.processObstaclesCollision(particle, currentTime)
+        // Collisions with particles
+        if (settings.internalCollisions) {
+            eventsProcessor.processParticlesCollision(particle, currentTime)
+        }
+    }
+
+    private suspend fun saveState(eventTime: Double) {
+        settings.eventDensity?.let { eventDensity ->
+            if (eventsCounter < eventDensity) {
+                eventsCounter++
+
+                // Try to store first and last events
+                if (eventQueue.size > 1 && currentTime != eventTime && currentTime < settings.finalTime) {
+                    return;
+                }
+            }
+        }
+        particleMap.values.forEach { p ->
+            outputChannel.send(
+                "${
+                    "%.6f".format(currentTime)
+                },${p.id},${
+                    "%.8f".format(p.x)
+                },${
+                    "%.8f".format(p.y)
+                },${
+                    "%.8f".format(p.vx)
+                },${
+                    "%.8f".format(p.vy)
+                }\n"
+            )
+        }
+        eventsCounter = 0
     }
 }

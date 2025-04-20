@@ -51,6 +51,10 @@ class Cli : CliktCommand() {
         .flag(default = false)
         .help("Whether internal particles can collide with each other")
 
+    private val eventDensity: Int? by option()
+        .int()
+        .help("[Optional] How many events should be skipped from writing to output file.")
+
     private val seed: Long by option("-s", "--seed")
         .long()
         .default(System.currentTimeMillis())
@@ -74,6 +78,7 @@ class Cli : CliktCommand() {
         logger.info { "Final time: $finalTime [s]" }
         logger.info { "Enable internal collisions: $enableInternalCollisions" }
         logger.info { "Seed: $seed" }
+        logger.info { "Event density: $eventDensity" }
         logger.info { "Output directory: $outputDirectory" }
 
         val fileName = buildString {
@@ -84,6 +89,9 @@ class Cli : CliktCommand() {
             append("_t=$finalTime")
             append("_internalCollisions=$enableInternalCollisions")
             append("_seed=$seed")
+            if (eventDensity != null) {
+                append("_eventDensity=$eventDensity")
+            }
         }.replace(".", "_").replace("=", "-") + ".csv"
 
         val outputCsv = outputDirectory.resolve(fileName).toFile()
@@ -103,7 +111,8 @@ class Cli : CliktCommand() {
             outputFile = outputCsv,
             particles = ParticleGenerator(generatorSettings).generate(),
             finalTime = finalTime,
-            internalCollisions = enableInternalCollisions
+            internalCollisions = enableInternalCollisions,
+            eventDensity = eventDensity
         )
 
         runBlocking {
@@ -115,7 +124,7 @@ class Cli : CliktCommand() {
             val simulationJob = launch { simulation.simulate() }
 
             simulationJob.join()
-            logger.info { "Simulation finished. Waiting for writer to finish.)" }
+            logger.info { "Simulation finished. Waiting for writer to finish." }
 
             writer.requestStop()
             writerJob.join()

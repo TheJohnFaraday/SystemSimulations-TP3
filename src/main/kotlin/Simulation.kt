@@ -25,6 +25,8 @@ class Simulation(
 
     suspend fun simulate() = withContext(dispatcher) {
         outputChannel.send("time,id,x,y,vx,vy\n")
+        // Save initial state to file
+        saveState()
 
         // First events
         processInitialEvents()
@@ -42,7 +44,7 @@ class Simulation(
             // Advance all the particles (only position)
             particleMap.replaceAll { _, p -> p.advance(dt) }
             // Save current state to file
-            saveState(event.time)
+            saveState()
             // Next step
             eventsProcessor.process(p1, event, currentTime)
         }
@@ -71,13 +73,12 @@ class Simulation(
         }
     }
 
-    private suspend fun saveState(eventTime: Double) {
+    private suspend fun saveState() {
         settings.eventDensity?.let { eventDensity ->
             if (eventsCounter < eventDensity) {
                 eventsCounter++
 
-                // Try to store first and last events
-                if (eventQueue.size > 1 && currentTime != eventTime && currentTime < settings.finalTime) {
+                if (eventQueue.size > 1 && currentTime > 0 && currentTime < settings.finalTime) {
                     return;
                 }
             }

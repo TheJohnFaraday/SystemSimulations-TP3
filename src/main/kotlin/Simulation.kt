@@ -58,7 +58,19 @@ class Simulation(
 
             // Save state
             particleMap.values.forEach { p ->
-                outputChannel.send("${"%.6f".format(currentTime)},${p.id},${p.x},${p.y},${p.vx},${p.vy}\n")
+                outputChannel.send(
+                    "${
+                        "%.6f".format(currentTime)
+                    },${p.id},${
+                        "%.8f".format(p.x)
+                    },${
+                        "%.8f".format(p.y)
+                    },${
+                        "%.8f".format(p.vx)
+                    },${
+                        "%.8f".format(p.vy)
+                    }\n"
+                )
             }
 
             // Next step

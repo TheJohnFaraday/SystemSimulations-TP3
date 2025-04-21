@@ -12,5 +12,6 @@ data class GeneratorSettings(
     val seed: Long,
     // System configuration
     val obstacleRadius: Double,
+    val obstacleMass: Double?,
     val containerRadius: Double
 )

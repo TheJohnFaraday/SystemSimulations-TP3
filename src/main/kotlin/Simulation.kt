@@ -25,8 +25,6 @@ class Simulation(
 
     suspend fun simulate() = withContext(dispatcher) {
         outputChannel.send("time,id,x,y,vx,vy\n")
-        // Save initial state to file
-        saveState()
 
         // First events
         processInitialEvents()
@@ -66,6 +64,7 @@ class Simulation(
 
 
     private fun processInitialEvents() = particleMap.forEach { (_, particle) ->
+        eventsProcessor.processWallCollision(particle, currentTime)
         eventsProcessor.processObstaclesCollision(particle, currentTime)
         // Collisions with particles
         if (settings.internalCollisions) {

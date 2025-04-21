@@ -25,7 +25,7 @@ class Cli : CliktCommand() {
 
     private val radius: Double by option("-r", "--radius")
         .double()
-        .default(0.0005)
+        .default(5e-4)
         .help("Radius of the particles [m]")
         .check("Must be greater than 0") { it > 0.0 }
 
@@ -54,6 +54,20 @@ class Cli : CliktCommand() {
     private val eventDensity: Int? by option()
         .int()
         .help("[Optional] How many events should be skipped from writing to output file.")
+
+    private val obstacleRadius: Double by option()
+        .double()
+        .default(0.005)
+        .check("Obstacle must have a radius greater than zero") { it > 0.0 }
+
+    private val obstacleMass: Double? by option()
+        .double()
+        .check("Obstacle mass must be greater than zero or undefined if it doesn't have mass") { it > 0.0 }
+
+    private val containerRadius: Double by option()
+        .double()
+        .default(0.05)
+        .check("Container must have a radius greater than zero and greater than the obstacle") { it > 0.0 && it > obstacleRadius }
 
     private val seed: Long by option("-s", "--seed")
         .long()
@@ -103,8 +117,9 @@ class Cli : CliktCommand() {
             mass = mass,
             initialVelocity = initialVelocity,
             seed = seed,
-            obstacleRadius = 0.005,
-            containerRadius = 0.05
+            obstacleRadius = obstacleRadius,
+            obstacleMass = obstacleMass,
+            containerRadius = containerRadius
         )
         val settings = Settings(
             generatorSettings = generatorSettings,

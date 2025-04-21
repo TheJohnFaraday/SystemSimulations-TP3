@@ -41,6 +41,19 @@ class ParticleGenerator(
             particles[id] = Particle(id, particleRadius, settings.mass, x, y, vx, vy)
         }
 
+        // Special case: obstacle has mass and starts stationary in (0, 0)
+        if (settings.obstacleMass != null && settings.obstacleMass > 0.0) {
+            particles[settings.numberOfParticles] = Particle(
+                settings.numberOfParticles,
+                settings.obstacleRadius,
+                settings.obstacleMass,
+                0.0,
+                0.0,
+                0.0,
+                0.0
+            )
+        }
+
         return particles
     }
 }

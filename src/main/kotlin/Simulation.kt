@@ -6,7 +6,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.withContext
 import java.util.*
-import kotlin.time.measureTime
 
 class Simulation(
     private val settings: Settings,
@@ -19,7 +18,7 @@ class Simulation(
     private var eventsCounter = 0
 
     /* The priority queue has the lowest t values first */
-    private val eventQueue = PriorityQueue<CollisionEvent>()
+    private val eventQueue = PriorityQueue<CollisionEvent>(compareBy { it.time })
     private val particleMap = settings.particles.toMutableMap();
     private val eventsProcessor = CollisionProcessor(settings, eventQueue, particleMap)
 
@@ -27,24 +26,39 @@ class Simulation(
         outputChannel.send("time,id,x,y,vx,vy\n")
 
         // First events
-        processInitialEvents()
+        eventsProcessor.calculateEventsTime(currentTime)
 
+        var debugEventsCounter = 0
         while (eventQueue.isNotEmpty() && currentTime < settings.finalTime) {
             val event = eventQueue.poll()
-
             val p1 = particleMap[event.particle.id] ?: continue
 
-            // check if is a valid event
             if (!isValidEvent(p1, event)) continue
 
+            if (!CollisionUtils.areParticlesWithinBorders(particleMap, settings.generatorSettings)) {
+                logger.error{"In simulation (1) | events = $debugEventsCounter"};
+            }
+
             val dt = event.time - currentTime
+            if (dt == 0.0) continue
+
             currentTime = event.time
             // Advance all the particles (only position)
             particleMap.replaceAll { _, p -> p.advance(dt) }
+//            if (!CollisionUtils.areParticlesWithinBorders(particleMap, settings.generatorSettings)) {
+//                logger.error{"In simulation (2) | events = $debugEventsCounter"};
+//            }
             // Save current state to file
             saveState()
-            // Next step
-            eventsProcessor.process(p1, event, currentTime)
+            // Update particle speed after collision
+            eventsProcessor.executeParticleCollision(p1, event, currentTime)
+//            if (!CollisionUtils.areParticlesWithinBorders(particleMap, settings.generatorSettings)) {
+//                logger.error{"In simulation (3) | events = $debugEventsCounter"};
+//            }
+
+            eventQueue.clear()
+            eventsProcessor.calculateEventsTime(currentTime)
+            debugEventsCounter++
         }
 
         logger.info { "Finished" }
@@ -61,16 +75,6 @@ class Simulation(
         } else {
             true
         }
-
-
-    private fun processInitialEvents() = particleMap.forEach { (_, particle) ->
-        eventsProcessor.processWallCollision(particle, currentTime)
-        eventsProcessor.processObstaclesCollision(particle, currentTime)
-        // Collisions with particles
-        if (settings.internalCollisions) {
-            eventsProcessor.processParticlesCollision(particle, currentTime)
-        }
-    }
 
     private suspend fun saveState() {
         settings.eventDensity?.let { eventDensity ->

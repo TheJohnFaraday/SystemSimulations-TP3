@@ -1,10 +1,17 @@
 package ar.edu.itba.ss
 
-import kotlin.math.cos
-import kotlin.math.pow
-import kotlin.math.sin
-import kotlin.math.sqrt
+import kotlin.math.*
 import kotlin.random.Random
+
+data class PolarCoordinates(
+    val r: Double,
+    val angle: Double
+)
+
+data class PolarVelocity(
+    val normal: Double,
+    val tangential: Double
+)
 
 data class Particle(
     val id: Int,
@@ -16,6 +23,9 @@ data class Particle(
     val vy: Double,
     val collisionCount: Int = 0
 ) {
+    val polarCoordinates: PolarCoordinates by lazy { toPolar() }
+    val polarVelocity: PolarVelocity by lazy { toVnVt() }
+
     companion object {
         fun randomVelocities(v0: Double, random: Random): Pair<Double, Double> {
             // v0 is the initial module of the velocities. We need to generate vx and vy
@@ -35,10 +45,9 @@ data class Particle(
         }
 
         fun fromVnVt(p: Particle, vn: Double, vt: Double): Particle {
-            val r = sqrt(p.x * p.x + p.y * p.y)
-            if (r == 0.0) return p.copy(vx = 0.0, vy = 0.0)
-            val nx = p.x / r
-            val ny = p.y / r
+            if (p.polarCoordinates.r == 0.0) return p.copy(vx = 0.0, vy = 0.0)
+            val nx = p.x / p.polarCoordinates.r
+            val ny = p.y / p.polarCoordinates.r
 
             val vx = vn * nx - vt * ny
             val vy = vn * ny + vt * nx
@@ -54,16 +63,22 @@ data class Particle(
         )
     }
 
-    fun toVnVt(): Pair<Double, Double> {
-        val r = sqrt(x * x + y * y)
-        if (r == 0.0) return Pair(0.0, 0.0)
-        val nx = x / r
-        val ny = y / r
+    private fun toVnVt(): PolarVelocity {
+        if (polarCoordinates.r == 0.0) return PolarVelocity(0.0, 0.0)
+        val nx = x / polarCoordinates.r
+        val ny = y / polarCoordinates.r
 
         val vn = vx * nx + vy * ny
         val vt = -vx * ny + vy * nx
 
-        return Pair(vn, vt)
+        return PolarVelocity(normal = vn, tangential = vt)
+    }
+
+    private fun toPolar(): PolarCoordinates {
+        return PolarCoordinates(
+            r = sqrt(x * x + y * y),
+            angle = atan2(y, x)
+        )
     }
 
     override fun toString(): String {

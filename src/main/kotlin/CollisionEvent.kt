@@ -7,8 +7,4 @@ data class CollisionEvent(
     val collisionCount: Int,
     val other: Particle? = null, // only if we have particle collision
     val otherCollisionCount: Int? = null
-) : Comparable<CollisionEvent> {
-    override fun compareTo(other: CollisionEvent): Int {
-        return time.compareTo(other.time)
-    }
-}
+)

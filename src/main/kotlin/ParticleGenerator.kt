@@ -1,5 +1,6 @@
 package ar.edu.itba.ss
 
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
@@ -7,6 +8,7 @@ import kotlin.math.sqrt
 class ParticleGenerator(
     private val settings: GeneratorSettings
 ) {
+    private val logger = KotlinLogging.logger {}
 
     fun generate(): Map<Int, Particle> {
         val obstacleRadius = settings.obstacleRadius
@@ -53,7 +55,9 @@ class ParticleGenerator(
                 0.0
             )
         }
-
+//        if (!CollisionUtils.areParticlesWithinBorders(particles, settings)) {
+//            logger.error{"On ParticleGenerator"};
+//        }
         return particles
     }
 }

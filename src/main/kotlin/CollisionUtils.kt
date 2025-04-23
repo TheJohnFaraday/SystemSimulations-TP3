@@ -1,23 +1,30 @@
 package ar.edu.itba.ss
 
+import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlin.math.pow
 import kotlin.math.sqrt
 
 object CollisionUtils {
+    private val logger = KotlinLogging.logger {}
 
     /* Using normal simplifies the problem. If vn>0 the particle is getting closer to the wall */
     fun timeToWallCollision(p: Particle, containerRadius: Double): Double {
-        val r = sqrt(p.x * p.x + p.y * p.y)
-        val vn = p.toVnVt().first
-        val distanceToWall = containerRadius - p.radius - r
-        return if (vn <= 0) Double.POSITIVE_INFINITY else distanceToWall / vn
+        val velocity = p.polarVelocity
+        if (velocity.normal <= 0) {
+            return Double.POSITIVE_INFINITY
+        }
+        val distanceToWall = containerRadius - p.polarCoordinates.r - p.radius
+        return distanceToWall / velocity.normal
     }
 
     /* Using normal simplifies the problem. If vn<0 the particle is getting closer to the obstacle */
     fun timeToObstacleCollision(p: Particle, obstacleRadius: Double): Double {
-        val r = sqrt(p.x * p.x + p.y * p.y)
-        val vn = p.toVnVt().first
-        val distanceToObstacle = r - obstacleRadius - p.radius
-        return if (vn >= 0) Double.POSITIVE_INFINITY else -distanceToObstacle / vn
+        val velocity = p.polarVelocity
+        if (velocity.normal >= 0) {
+            return Double.POSITIVE_INFINITY
+        }
+        val distanceToObstacle = p.polarCoordinates.r - obstacleRadius - p.radius
+        return -distanceToObstacle / velocity.normal
     }
 
     fun timeToParticleCollision(p1: Particle, p2: Particle): Double {
@@ -43,8 +50,8 @@ object CollisionUtils {
 
     /* We only change the sign of the normal */
     fun reflectNormal(p: Particle): Particle {
-        val (vn, vt) = p.toVnVt()
-        return Particle.fromVnVt(p, -vn, vt).copy(collisionCount = p.collisionCount + 1)
+        val velocity = p.polarVelocity
+        return Particle.fromVnVt(p, -velocity.normal, velocity.tangential).copy(collisionCount = p.collisionCount + 1)
     }
 
     fun resolveParticleCollision(p1: Particle, p2: Particle): Pair<Particle, Particle> {
@@ -71,6 +78,26 @@ object CollisionUtils {
         )
 
         return Pair(newP1, newP2)
+    }
+
+    fun areParticlesWithinBorders(
+        particles: Map<Int, Particle>,
+        generatorSettings: GeneratorSettings
+    ): Boolean {
+        val withinContainer = particles.values.filter { p ->
+            p.polarCoordinates.r + p.radius >= generatorSettings.containerRadius
+        }
+        if (withinContainer.isNotEmpty()) {
+            logger.error { "Outside of container: ${withinContainer.first()}" }
+        }
+        val outsideObstacle = particles.values.filter { p ->
+            sqrt((p.x - 0.0).pow(2) + (p.y - 0.0).pow(2)) <= p.radius + generatorSettings.obstacleRadius
+        }
+        if (outsideObstacle.isNotEmpty()) {
+            logger.error { "Inside obstacle: ${outsideObstacle.first()}" }
+        }
+
+        return withinContainer.isEmpty() && outsideObstacle.isEmpty();
     }
 }
 

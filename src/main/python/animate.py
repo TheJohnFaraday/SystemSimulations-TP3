@@ -15,8 +15,10 @@ parser.add_argument("-f", "--output_file", type=str, required=True,
 
 args = parser.parse_args()
 
+MAX_DESIRED_FPS = 24
+
 PARTICLE_RADIUS = 0.0005
-BOARD_RADIUS = 0.1
+BOARD_RADIUS = 0.05
 OBSTACLE_RADIUS = 0.005 if args.fixed_obstacle else None
 output_file = args.output_file
 print(f"OBSTACLE_RADIUS: {OBSTACLE_RADIUS}")
@@ -145,8 +147,9 @@ ani = FuncAnimation(fig, update, frames=len(times),
 print("Saving animation...")
 ani.save(f'./animations/{output_file}-simulation.mp4', 
          writer='ffmpeg', 
-         fps=len(times)/TOTAL_DURATION,
-         dpi=100)
+         fps=min(len(times)/TOTAL_DURATION, MAX_DESIRED_FPS),
+         dpi=100,
+         extra_args=['-crf', '26', '-preset', 'veryfast'])  # smaller file, faster encode
 print("Animation saved successfully!")
 
 # Close the figure to free memory

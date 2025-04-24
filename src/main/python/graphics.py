@@ -11,6 +11,7 @@ CONTAINER_RADIUS = 0.1 / 2  # In m
 OBSTACLE_RADIUS = 0.005  # In m
 PARTICLE_RADIUS = 5e-4  # In m
 PARTICLE_MASS = 1.0  # In kg
+OBSTACLE_MASS = 3.0 # In kg
 
 PERIM_CONTAINER = 2 * np.pi * CONTAINER_RADIUS
 PERIM_OBSTACLE = 2 * np.pi * OBSTACLE_RADIUS
@@ -213,7 +214,7 @@ if __name__ == "__main__":
         "-o",
         "--fixed_obstacle",
         action="store_true",
-        help="Animate with a fixed obstacle",
+        help="If present, it will assume that the obstacle is fixed at the center, otherwise it will use the last particle index as the obstacle to run calculations",
     )
     parser.add_argument(
         "-f", "--output_file", type=str, required=True, help="Output file to animate"
@@ -221,4 +222,4 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    main(args.output_file, True if args.fixed_obstacle else False)
+    main(output_file=args.output_file, fixed_obstacle=True if args.fixed_obstacle else False)

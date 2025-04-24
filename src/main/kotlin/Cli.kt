@@ -57,7 +57,7 @@ class Cli : CliktCommand() {
 
     private val obstacleRadius: Double by option()
         .double()
-        .default(0.005)
+        .default(5e-3)
         .check("Obstacle must have a radius greater than zero") { it > 0.0 }
 
     private val obstacleMass: Double? by option()
@@ -66,7 +66,7 @@ class Cli : CliktCommand() {
 
     private val containerRadius: Double by option()
         .double()
-        .default(0.05)
+        .default(5e-2)
         .check("Container must have a radius greater than zero and greater than the obstacle") { it > 0.0 && it > obstacleRadius }
 
     private val seed: Long by option("-s", "--seed")
@@ -94,6 +94,10 @@ class Cli : CliktCommand() {
         logger.info { "Seed: $seed" }
         logger.info { "Event density: $eventDensity" }
         logger.info { "Output directory: $outputDirectory" }
+        logger.info { "Container Radius: $containerRadius"}
+        logger.info { "Obstacle radius: $obstacleRadius" }
+        logger.info { "Obstacle Mass: ${obstacleMass?.toString() ?: "Not Defined"}" }
+        logger.info { "Event Density: ${eventDensity?.toString() ?: "All events recorded"}" }
 
         val fileName = buildString {
             append("particles=$numberOfParticles")
@@ -103,6 +107,11 @@ class Cli : CliktCommand() {
             append("_t=$finalTime")
             append("_internalCollisions=$enableInternalCollisions")
             append("_seed=$seed")
+            append("_containerRadius=$containerRadius")
+            append("_obstacleRadius=$obstacleRadius")
+            if (obstacleMass != null) {
+                append("_obstacleMass=$obstacleMass")
+            }
             if (eventDensity != null) {
                 append("_eventDensity=$eventDensity")
             }

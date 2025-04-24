@@ -108,9 +108,9 @@ class CollisionProcessor(
         val p2 = particleMap[event.other?.id] ?: return
 
         // Reflect the velocities
-//        val (newP1, newP2) = CollisionUtils.resolveParticleCollision(p1, p2)
-        val newP1 = CollisionUtils.reflectNormal(p1)
-        val newP2 = CollisionUtils.reflectNormal(p2)
+        val (newP1, newP2) = CollisionUtils.resolveParticleCollision(p1, p2)
+        //val newP1 = CollisionUtils.reflectNormal(p1)
+        //val newP2 = CollisionUtils.reflectNormal(p2)
         particleMap[newP1.id] = newP1
         particleMap[newP2.id] = newP2
 

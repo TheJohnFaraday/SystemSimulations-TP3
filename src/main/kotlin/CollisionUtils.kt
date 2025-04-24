@@ -1,6 +1,7 @@
 package ar.edu.itba.ss
 
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlin.math.abs
 import kotlin.math.pow
 import kotlin.math.sqrt
 
@@ -55,6 +56,31 @@ object CollisionUtils {
     }
 
     fun resolveParticleCollision(p1: Particle, p2: Particle): Pair<Particle, Particle> {
+        // 1. Calcular vector distancia actual
+        var dx = p2.x - p1.x
+        var dy = p2.y - p1.y
+        val currentDist = sqrt(dx * dx + dy * dy)
+        val sumRadii = p1.radius + p2.radius
+
+        // 2. Ajustar posiciones para garantizar contacto exacto (Opción A)
+        if (abs(currentDist - sumRadii) > 1e-10) {  // Evitar ajuste innecesario si ya están bien
+            val correctionFactor = sumRadii / currentDist
+            dx *= correctionFactor
+            dy *= correctionFactor
+            // Actualizamos p2 para que esté exactamente a r1 + r2 de p1
+            val correctedP2 = p2.copy(
+                x = p1.x + dx,
+                y = p1.y + dy
+            )
+            // Usamos p2 corregida en los cálculos siguientes
+            return resolveCorrectedCollision(p1, correctedP2)
+        } else {
+            return resolveCorrectedCollision(p1, p2)
+        }
+    }
+
+    // Función auxiliar que asume partículas ya en contacto exacto
+    private fun resolveCorrectedCollision(p1: Particle, p2: Particle): Pair<Particle, Particle> {
         val dx = p2.x - p1.x
         val dy = p2.y - p1.y
         val dvx = p2.vx - p1.vx
@@ -62,22 +88,22 @@ object CollisionUtils {
         val dvdr = dx * dvx + dy * dvy
         val dist = p1.radius + p2.radius
 
-        val j = 2 * p1.mass * p2.mass * dvdr / ((p1.mass + p2.mass) * dist)
+        val j = 2.0 * p1.mass * p2.mass * dvdr / ((p1.mass + p2.mass) * dist)
         val jx = j * dx / dist
         val jy = j * dy / dist
 
-        val newP1 = p1.copy(
-            vx = p1.vx + jx / p1.mass,
-            vy = p1.vy + jy / p1.mass,
-            collisionCount = p1.collisionCount + 1
+        return Pair(
+            p1.copy(
+                vx = p1.vx + jx / p1.mass,
+                vy = p1.vy + jy / p1.mass,
+                collisionCount = p1.collisionCount + 1
+            ),
+            p2.copy(
+                vx = p2.vx - jx / p2.mass,
+                vy = p2.vy - jy / p2.mass,
+                collisionCount = p2.collisionCount + 1
+            )
         )
-        val newP2 = p2.copy(
-            vx = p2.vx - jx / p2.mass,
-            vy = p2.vy - jy / p2.mass,
-            collisionCount = p2.collisionCount + 1
-        )
-
-        return Pair(newP1, newP2)
     }
 
     fun areParticlesWithinBorders(

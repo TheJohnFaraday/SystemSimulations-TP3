@@ -55,9 +55,6 @@ class ParticleGenerator(
                 0.0
             )
         }
-//        if (!CollisionUtils.areParticlesWithinBorders(particles, settings)) {
-//            logger.error{"On ParticleGenerator"};
-//        }
         return particles
     }
 }

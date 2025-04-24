@@ -35,26 +35,16 @@ class Simulation(
 
             if (!isValidEvent(p1, event)) continue
 
-            if (!CollisionUtils.areParticlesWithinBorders(particleMap, settings.generatorSettings)) {
-                logger.error{"In simulation (1) | events = $debugEventsCounter"};
-            }
-
             val dt = event.time - currentTime
             if (dt == 0.0) continue
 
             currentTime = event.time
             // Advance all the particles (only position)
             particleMap.replaceAll { _, p -> p.advance(dt) }
-//            if (!CollisionUtils.areParticlesWithinBorders(particleMap, settings.generatorSettings)) {
-//                logger.error{"In simulation (2) | events = $debugEventsCounter"};
-//            }
             // Save current state to file
             saveState()
             // Update particle speed after collision
-            eventsProcessor.executeParticleCollision(p1, event, currentTime)
-//            if (!CollisionUtils.areParticlesWithinBorders(particleMap, settings.generatorSettings)) {
-//                logger.error{"In simulation (3) | events = $debugEventsCounter"};
-//            }
+            eventsProcessor.executeParticleCollision(p1, event)
 
             eventQueue.clear()
             eventsProcessor.calculateEventsTime(currentTime)

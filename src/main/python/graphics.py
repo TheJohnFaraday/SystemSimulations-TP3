@@ -7,6 +7,8 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
+DT_FIXED = 0.1
+
 # ------------------------------
 
 CUSTOM_PALETTE = [
@@ -141,24 +143,31 @@ def plot_pressure(pressure_df: pd.DataFrame, output_dir: str):
     plt.close()
 
 
-def calculate_j(sim_params: SimulationParameters, snap: pd.DataFrame):
-    hit_container = (snap["v_n"] > 0) & (
-            sim_params.r_container - snap["r"] - snap["radius"] <= 1e-5
-    )
-    obstacle_distance = snap["r"] - (snap["radius"] + sim_params.r_obstacle)
-    hit_obstacle = (snap["v_n"] < 0) & (
-            obstacle_distance <= 1e-5
-    )
-    j_container = (2 * snap["m"] * np.abs(snap["v_n"][hit_container])).sum()
-    j_obstacle = (2 * snap["m"] * np.abs(snap["v_n"][hit_obstacle])).sum()
-    return {"container": j_container, "obstacle": j_obstacle}
+def classify_collision(df: pd.DataFrame, sim: SimulationParameters, tol: float = 1e-5):
+    """
+    Returns a Series indexed exactly like `df` with values:
+      'WALL' | 'OBSTACLE' | np.nan  (no collision)
+    """
+    # distance to outer wall (container)
+    d_wall = sim.r_container - df["r"] - df["radius"]
+    hit_wall = (df["v_n"] > 0) & (d_wall <= tol)
+
+    # distance to inner obstacle
+    d_obstacle = df["r"] - (df["radius"] + sim.r_obstacle)
+    hit_obs = (df["v_n"] < 0) & (d_obstacle <= tol)
+
+    out = pd.Series(index=df.index, dtype="object")
+    out.loc[hit_wall] = "WALL"
+    out.loc[hit_obs] = "OBSTACLE"
+    return out
 
 
-def calculate_pressure(sim_params: SimulationParameters, df: pd.DataFrame, df_aux: pd.DataFrame):
+def calculate_pressure(sim_params: SimulationParameters, df: pd.DataFrame):
     # P = J / (delta t * L)
-    DT_FIXED = 0.1
 
-    coll = df.join(df_aux[["type"]], how="inner")
+    df = df.copy()
+    df["type"] = classify_collision(df, sim_params)
+    coll = df.dropna(subset=["type"]).copy()
 
     # J = 2 m |v_n|
     coll["j"] = 2.0 * coll["m"] * coll["v_n"].abs()
@@ -166,19 +175,28 @@ def calculate_pressure(sim_params: SimulationParameters, df: pd.DataFrame, df_au
     times = coll.index.get_level_values(0).to_numpy()
     coll["bin_id"] = np.floor_divide(times, DT_FIXED).astype(int)
 
-    j_sum = coll.groupby(["bin_id", "type"], sort=True)["j"].sum().unstack(fill_value=0.0)
+    j_sum = (
+        coll.groupby(["bin_id", "type"], sort=True)["j"]
+        .sum()
+        .unstack(fill_value=0.0)
+        .reindex(columns=["WALL", "OBSTACLE"], fill_value=0.0)
+    )
     j_sum = j_sum.reindex(columns=["WALL", "OBSTACLE"], fill_value=0.0)
 
     P_cont = j_sum["WALL"] / (DT_FIXED * sim_params.perimeter_container)  # Pa
     P_obs = j_sum["OBSTACLE"] / (DT_FIXED * sim_params.perimeter_obstacle)  # Pa
-    return pd.DataFrame(
-        {
-            # "time": t,
-            "time": j_sum.index * DT_FIXED,
-            "pressure_container": P_cont,
-            "pressure_obstacle": P_obs,
-        }
-    ).set_index("time").sort_index()
+    return (
+        pd.DataFrame(
+            {
+                # "time": t,
+                "time": j_sum.index * DT_FIXED,
+                "pressure_container": P_cont,
+                "pressure_obstacle": P_obs,
+            }
+        )
+        .set_index("time")
+        .sort_index()
+    )
 
 
 def read_csv(filepath: str):
@@ -204,16 +222,7 @@ def read_csv(filepath: str):
     )
     df.set_index("time", inplace=True)
 
-    df_aux = pd.read_csv(
-        filepath + "_clone",
-        sep=",",  # separator (default is comma)
-        header=0,  # use first row as header
-        index_col=None,  # don't use any column as index
-        skiprows=0,  # number of rows to skip
-    )
-    df_aux.set_index("time", inplace=True)
-
-    return config, df, df_aux
+    return config, df
 
 
 def main(output_file: str, fixed_obstacle: bool):
@@ -221,11 +230,10 @@ def main(output_file: str, fixed_obstacle: bool):
     output_base_dir = "./analysis"
     os.makedirs(output_base_dir, exist_ok=True)
 
-    simulation_params, df, df_aux = read_csv(f"{input_dir}/{output_file}")
+    simulation_params, df = read_csv(f"{input_dir}/{output_file}")
     print(df)
-    print(df_aux)
 
-    pressure_df = calculate_pressure(simulation_params, df, df_aux)
+    pressure_df = calculate_pressure(simulation_params, df)
     plot_pressure(pressure_df, output_base_dir)
     print(pressure_df.head())
 

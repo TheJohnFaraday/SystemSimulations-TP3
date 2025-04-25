@@ -23,7 +23,20 @@ class Simulation(
     private val eventsProcessor = CollisionProcessor(settings, eventQueue, particleMap)
 
     suspend fun simulate() = withContext(dispatcher) {
-        outputChannel.send("time,id,x,y,vx,vy\n")
+        // Params
+        outputChannel.send("L/2,n,R,m_R,seed\n")
+        outputChannel.send(
+            listOf(
+                "%.8f".format(settings.generatorSettings.containerRadius),
+                settings.generatorSettings.numberOfParticles,
+                "%.8f".format(settings.generatorSettings.obstacleRadius),
+                "%.8f".format(settings.generatorSettings.obstacleMass),
+                settings.generatorSettings.seed,
+            ).joinToString(separator = ",", postfix = "\n")
+        )
+
+        // Header
+        outputChannel.send("time,id,x,y,vx,vy,radius,m,r,v_n\n")
 
         // First events
         eventsProcessor.calculateEventsTime(currentTime)
@@ -77,19 +90,19 @@ class Simulation(
             }
         }
         particleMap.values.forEach { p ->
-            outputChannel.send(
-                "${
-                    "%.6f".format(currentTime)
-                },${p.id},${
-                    "%.8f".format(p.x)
-                },${
-                    "%.8f".format(p.y)
-                },${
-                    "%.8f".format(p.vx)
-                },${
-                    "%.8f".format(p.vy)
-                }\n"
-            )
+
+            outputChannel.send(listOf(
+                "%.6f".format(currentTime),
+                p.id,
+                "%.8f".format(p.x),
+                "%.8f".format(p.y),
+                "%.8f".format(p.vx),
+                "%.8f".format(p.vy),
+                "%.8f".format(p.radius),
+                "%.8f".format(p.mass),
+                "%.8f".format(p.polarCoordinates.r),
+                "%.8f".format(p.polarVelocity.normal)
+            ).joinToString(separator = ",", postfix = "\n"))
         }
         eventsCounter = 0
     }

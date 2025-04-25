@@ -1,20 +1,11 @@
 import argparse
 import os
+from dataclasses import dataclass
 
 import matplotlib.pyplot as plt
-# import matplotlib.ticker as tick
 import numpy as np
 import pandas as pd
 import seaborn as sns
-
-CONTAINER_RADIUS = 0.1 / 2  # In m
-OBSTACLE_RADIUS = 0.005  # In m
-PARTICLE_RADIUS = 5e-4  # In m
-PARTICLE_MASS = 1.0  # In kg
-OBSTACLE_MASS = 3.0 # In kg
-
-PERIM_CONTAINER = 2 * np.pi * CONTAINER_RADIUS
-PERIM_OBSTACLE = 2 * np.pi * OBSTACLE_RADIUS
 
 # ------------------------------
 
@@ -60,6 +51,19 @@ sns.set_style(PLT_THEME)
 
 DPI = 100
 FIGSIZE = (1920 / DPI, 1080 / DPI)
+
+# ------------------------------
+
+
+@dataclass
+class SimulationParameters:
+    r_container: float
+    n_particles: int
+    r_obstacle: float
+    m_obstacle: float | None
+    seed: int
+    perimeter_container: float
+    perimeter_obstacle: float
 
 
 def format_power_of_10(x):
@@ -135,17 +139,20 @@ def plot_pressure(pressure_df: pd.DataFrame, output_dir: str):
     plt.clf()
     plt.close()
 
-def calculate_j(snap: pd.DataFrame):
+
+def calculate_j(sim_params: SimulationParameters, snap: pd.DataFrame):
     hit_container = (snap["v_n"] > 0) & (
-        snap["r"] + PARTICLE_RADIUS >= CONTAINER_RADIUS
+        snap["r"] + snap["radius"] >= sim_params.r_container
     )
-    hit_obstacle = (snap["v_n"] < 0) & (snap["r"] - PARTICLE_RADIUS <= OBSTACLE_RADIUS)
-    j_container = (2 * PARTICLE_MASS * np.abs(snap["v_n"][hit_container])).sum()
-    j_obstacle = (2 * PARTICLE_MASS * np.abs(snap["v_n"][hit_obstacle])).sum()
+    hit_obstacle = (snap["v_n"] < 0) & (
+        snap["r"] - snap["radius"] <= sim_params.r_obstacle
+    )
+    j_container = (2 * snap["m"] * np.abs(snap["v_n"][hit_container])).sum()
+    j_obstacle = (2 * snap["m"] * np.abs(snap["v_n"][hit_obstacle])).sum()
     return {"container": j_container, "obstacle": j_obstacle}
 
 
-def calculate_pressure(df: pd.DataFrame):
+def calculate_pressure(sim_params: SimulationParameters, df: pd.DataFrame):
     # P = J / (delta t * L)
 
     # sorted list of unique times in the file
@@ -156,10 +163,10 @@ def calculate_pressure(df: pd.DataFrame):
 
     records = []
     for dt, t in zip(delta_t, times):
-        j = calculate_j(df.loc[t])
+        j = calculate_j(sim_params, df.loc[t])
 
-        P_cont = j["container"] / (dt * PERIM_CONTAINER)  # Pa
-        P_obs = j["obstacle"] / (dt * PERIM_OBSTACLE)  # Pa
+        P_cont = j["container"] / (dt * sim_params.perimeter_container)  # Pa
+        P_obs = j["obstacle"] / (dt * sim_params.perimeter_obstacle)  # Pa
 
         # Skip times without pressure
         # if P_cont == 0.0 and P_obs == 0.0:
@@ -177,17 +184,30 @@ def calculate_pressure(df: pd.DataFrame):
     return pressure_df
 
 
-def read_csv(filename: str):
+def read_csv(filepath: str):
+    config_df = pd.read_csv(filepath, nrows=1, header=0, keep_default_na=False)
+    config = SimulationParameters(
+        r_container=float(config_df["L/2"][0]),
+        n_particles=int(config_df["n"][0]),
+        r_obstacle=float(config_df["R"][0]),
+        m_obstacle=(
+            None if config_df["m_R"][0] == "null" else float(config_df["m_R"][0])
+        ),
+        seed=int(config_df["seed"][0]),
+        perimeter_container=(2 * np.pi * config_df["L/2"][0]),
+        perimeter_obstacle=(2 * np.pi * config_df["R"][0]),
+    )
+
     df = pd.read_csv(
-        f"./output/{filename}",
+        filepath,
         sep=",",  # separator (default is comma)
         header=0,  # use first row as header
         index_col=None,  # don't use any column as index
-        skiprows=0,  # number of rows to skip
+        skiprows=2,  # number of rows to skip
     )
     df.set_index("time", inplace=True)
 
-    return df
+    return config, df
 
 
 def main(output_file: str, fixed_obstacle: bool):
@@ -195,15 +215,24 @@ def main(output_file: str, fixed_obstacle: bool):
     output_base_dir = "./analysis"
     os.makedirs(output_base_dir, exist_ok=True)
 
-    df = read_csv(output_file)
-    df["r"] = np.hypot(df["x"], df["y"])
-    df["v_n"] = df["vx"] * (df["x"] / df["r"]) + df["vy"] * (  # vx * nx
-        df["y"] / df["r"]
-    )  # vy * ny
+    simulation_params, df = read_csv(f"{input_dir}/{output_file}")
+    print(df)
 
-    pressure_df = calculate_pressure(df)
+    pressure_df = calculate_pressure(simulation_params, df)
     plot_pressure(pressure_df, output_base_dir)
     print(pressure_df.head())
+
+    count_hits = 0
+    count_assisted_hits = 0
+    for index, row in df.iterrows():
+        vn = row["v_n"] < 0
+        len_val = row["r"] - row["radius"] - simulation_params.r_obstacle
+        hit = len_val <= 0.0
+        if hit:
+            count_hits += 1
+        elif vn and len_val < 1e-5:
+            count_assisted_hits += 1
+    print(f"{count_hits = }\t{count_assisted_hits = }")
 
 
 if __name__ == "__main__":
@@ -222,4 +251,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    main(output_file=args.output_file, fixed_obstacle=True if args.fixed_obstacle else False)
+    main(
+        output_file=args.output_file,
+        fixed_obstacle=True if args.fixed_obstacle else False,
+    )

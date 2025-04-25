@@ -1,5 +1,7 @@
 package ar.edu.itba.ss
 
+import ch.obermuhlner.math.big.kotlin.bigdecimal.plus
+import java.math.BigDecimal
 import java.util.*
 
 class CollisionProcessor(
@@ -16,7 +18,7 @@ class CollisionProcessor(
             CollisionType.PARTICLE -> particleEvent(p1, event)
         }
 
-    fun calculateEventsTime(currentTime: Double) = particleMap.forEach { (_, particle) ->
+    fun calculateEventsTime(currentTime: BigDecimal) = particleMap.forEach { (_, particle) ->
         processWallCollision(particle, currentTime)
         processObstaclesCollision(particle, currentTime)
         // Collisions with particles
@@ -26,10 +28,10 @@ class CollisionProcessor(
     }
 
 
-    private fun processWallCollision(particle: Particle, currentTime: Double) {
+    private fun processWallCollision(particle: Particle, currentTime: BigDecimal) {
         val timeToWall =
             CollisionUtils.timeToWallCollision(particle, settings.generatorSettings.containerRadius)
-        if (timeToWall.isFinite()) {
+        timeToWall?.let {
             eventQueue.add(
                 CollisionEvent(
                     currentTime + timeToWall,
@@ -41,14 +43,14 @@ class CollisionProcessor(
         }
     }
 
-    private fun processObstaclesCollision(particle: Particle, currentTime: Double) {
-        if (settings.generatorSettings.obstacleMass != null && settings.generatorSettings.obstacleMass > 0.0) {
+    private fun processObstaclesCollision(particle: Particle, currentTime: BigDecimal) {
+        if (settings.generatorSettings.obstacleMass != null && settings.generatorSettings.obstacleMass > BigDecimal.ZERO) {
             // Special case: will get calculated as another particle
             return;
         }
         val timeToObstacle =
             CollisionUtils.timeToObstacleCollision(particle, settings.generatorSettings.obstacleRadius)
-        if (timeToObstacle.isFinite()) {
+        timeToObstacle?.let {
             eventQueue.add(
                 CollisionEvent(
                     currentTime + timeToObstacle,
@@ -60,12 +62,12 @@ class CollisionProcessor(
         }
     }
 
-    private fun processParticlesCollision(particle: Particle, currentTime: Double) =
+    private fun processParticlesCollision(particle: Particle, currentTime: BigDecimal) =
         particleMap
             .filter { (_, other) -> particle.id != other.id } // Avoid (A,B) and (B,A)
             .forEach { (_, other) ->
                 val timeToParticle = CollisionUtils.timeToParticleCollision(particle, other)
-                if (timeToParticle.isFinite()) {
+                timeToParticle?.let {
                     eventQueue.add(
                         CollisionEvent(
                             time = currentTime + timeToParticle,
@@ -81,6 +83,7 @@ class CollisionProcessor(
 
     private fun wallEvent(p1: Particle) {
         // Reflect the velocities
+//        val updated = CollisionUtils.reflectNormal(CollisionUtils.resolveWallCollision(p1))
         val updated = CollisionUtils.reflectNormal(p1)
         particleMap[updated.id] = updated
     }
@@ -88,6 +91,7 @@ class CollisionProcessor(
     private fun obstacleEvent(p1: Particle) {
         // Reflect the velocities
         val updated = CollisionUtils.reflectNormal(p1)
+//        val updated = CollisionUtils.reflectNormal(CollisionUtils.resolveObstacleCollision(p1))
         particleMap[updated.id] = updated
     }
 

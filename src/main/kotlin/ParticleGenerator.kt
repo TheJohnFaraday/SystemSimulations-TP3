@@ -1,9 +1,11 @@
 package ar.edu.itba.ss
 
+import ch.obermuhlner.math.big.DefaultBigDecimalMath.*
+import ch.obermuhlner.math.big.kotlin.bigdecimal.minus
+import ch.obermuhlner.math.big.kotlin.bigdecimal.plus
+import ch.obermuhlner.math.big.kotlin.bigdecimal.times
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlin.math.cos
-import kotlin.math.sin
-import kotlin.math.sqrt
+import java.math.BigDecimal
 
 class ParticleGenerator(
     private val settings: GeneratorSettings
@@ -17,15 +19,16 @@ class ParticleGenerator(
         val particles = mutableMapOf<Int, Particle>()
 
         repeat(settings.numberOfParticles) { id ->
-            var x: Double
-            var y: Double
+            var x: BigDecimal
+            var y: BigDecimal
             var overlapping: Boolean
             var insideObstacle: Boolean
             var insideContainer: Boolean
 
             do {
-                val angle = settings.random.nextDouble() * 2 * Math.PI
-                val r = obstacleRadius + particleRadius + settings.random.nextDouble() * (containerRadius - obstacleRadius - 2 * particleRadius)
+                val angle = BigDecimal.valueOf(settings.random.nextDouble() * 2 * Math.PI)
+                val r =
+                    obstacleRadius + particleRadius + settings.random.nextDouble() * (containerRadius - obstacleRadius - 2 * particleRadius)
 
                 x = r * cos(angle)
                 y = r * sin(angle)
@@ -34,7 +37,10 @@ class ParticleGenerator(
                 insideContainer = sqrt(x * x + y * y) < (containerRadius - particleRadius)
 
                 overlapping = particles.values.any {
-                    Particle.areOverlapping(it, Particle(id, particleRadius, settings.mass, x, y, 0.0, 0.0))
+                    Particle.areOverlapping(
+                        it,
+                        Particle(id, particleRadius, settings.mass, x, y, BigDecimal.ZERO, BigDecimal.ZERO)
+                    )
                 }
 
             } while (overlapping || insideObstacle || !insideContainer)
@@ -44,15 +50,15 @@ class ParticleGenerator(
         }
 
         // Special case: obstacle has mass and starts stationary in (0, 0)
-        if (settings.obstacleMass != null && settings.obstacleMass > 0.0) {
+        if (settings.obstacleMass != null && settings.obstacleMass > BigDecimal.ZERO) {
             particles[settings.numberOfParticles] = Particle(
                 settings.numberOfParticles,
                 settings.obstacleRadius,
                 settings.obstacleMass,
-                0.0,
-                0.0,
-                0.0,
-                0.0
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO
             )
         }
         return particles

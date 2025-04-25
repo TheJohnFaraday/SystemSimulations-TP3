@@ -1,42 +1,45 @@
 package ar.edu.itba.ss
 
-import kotlin.math.*
+import ch.obermuhlner.math.big.DefaultBigDecimalMath
+import ch.obermuhlner.math.big.DefaultBigDecimalMath.*
+import ch.obermuhlner.math.big.kotlin.bigdecimal.*
+import java.math.BigDecimal
 import kotlin.random.Random
 
 data class PolarCoordinates(
-    val r: Double,
-    val angle: Double
+    val r: BigDecimal,
+    val angle: BigDecimal
 )
 
 data class PolarVelocity(
-    val normal: Double,
-    val tangential: Double
+    val normal: BigDecimal,
+    val tangential: BigDecimal
 )
 
 data class Particle(
     val id: Int,
-    val radius: Double,
-    val mass: Double,
-    val x: Double,
-    val y: Double,
-    val vx: Double,
-    val vy: Double,
+    val radius: BigDecimal,
+    val mass: BigDecimal,
+    val x: BigDecimal,
+    val y: BigDecimal,
+    val vx: BigDecimal,
+    val vy: BigDecimal,
     val collisionCount: Int = 0
 ) {
     val polarCoordinates: PolarCoordinates by lazy { toPolar() }
     val polarVelocity: PolarVelocity by lazy { toVnVt() }
 
     companion object {
-        fun randomVelocities(v0: Double, random: Random): Pair<Double, Double> {
+        fun randomVelocities(v0: BigDecimal, random: Random): Pair<BigDecimal, BigDecimal> {
             // v0 is the initial module of the velocities. We need to generate vx and vy
-            val angle = random.nextDouble() * 2 * Math.PI
+            val angle = BigDecimal.valueOf(random.nextDouble() * 2 * Math.PI)
             val vx = v0 * cos(angle)
             val vy = v0 * sin(angle)
             return Pair(vx, vy)
         }
 
-        fun distanceSquared(p1: Particle, p2: Particle): Double {
-            return (p1.x - p2.x).pow(2) + (p1.y - p2.y).pow(2)
+        fun distanceSquared(p1: Particle, p2: Particle): BigDecimal {
+            return pow(p1.x - p2.x, 2) + pow(p1.y - p2.y, 2)
         }
 
         fun areOverlapping(p1: Particle, p2: Particle): Boolean {
@@ -44,8 +47,11 @@ data class Particle(
             return distanceSquared(p1, p2) < minDist.pow(2)
         }
 
-        fun fromVnVt(p: Particle, vn: Double, vt: Double): Particle {
-            if (p.polarCoordinates.r == 0.0) return p.copy(vx = 0.0, vy = 0.0)
+        fun fromVnVt(p: Particle, vn: BigDecimal, vt: BigDecimal): Particle {
+            if (p.polarCoordinates.r == BigDecimal.ZERO) return p.copy(
+                vx = BigDecimal.ZERO,
+                vy = BigDecimal.ZERO
+            )
             val nx = p.x / p.polarCoordinates.r
             val ny = p.y / p.polarCoordinates.r
 
@@ -56,7 +62,7 @@ data class Particle(
         }
     }
 
-    fun advance(dt: Double): Particle {
+    fun advance(dt: BigDecimal): Particle {
         return this.copy(
             x = x + vx * dt,
             y = y + vy * dt
@@ -64,7 +70,7 @@ data class Particle(
     }
 
     private fun toVnVt(): PolarVelocity {
-        if (polarCoordinates.r == 0.0) return PolarVelocity(0.0, 0.0)
+        if (polarCoordinates.r == BigDecimal.ZERO) return PolarVelocity(BigDecimal.ZERO, BigDecimal.ZERO)
         val nx = x / polarCoordinates.r
         val ny = y / polarCoordinates.r
 

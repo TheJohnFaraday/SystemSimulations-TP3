@@ -10,6 +10,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import java.math.BigDecimal
 import java.nio.file.Path
 import kotlin.random.Random
 
@@ -94,7 +95,7 @@ class Cli : CliktCommand() {
         logger.info { "Seed: $seed" }
         logger.info { "Event density: $eventDensity" }
         logger.info { "Output directory: $outputDirectory" }
-        logger.info { "Container Radius: $containerRadius"}
+        logger.info { "Container Radius: $containerRadius" }
         logger.info { "Obstacle radius: $obstacleRadius" }
         logger.info { "Obstacle Mass: ${obstacleMass?.toString() ?: "Not Defined"}" }
         logger.info { "Event Density: ${eventDensity?.toString() ?: "All events recorded"}" }
@@ -122,19 +123,19 @@ class Cli : CliktCommand() {
         val generatorSettings = GeneratorSettings(
             random = Random(seed),
             numberOfParticles = numberOfParticles,
-            radius = radius,
-            mass = mass,
-            initialVelocity = initialVelocity,
+            radius = BigDecimal.valueOf(radius),
+            mass = BigDecimal.valueOf(mass),
+            initialVelocity = BigDecimal.valueOf(initialVelocity),
             seed = seed,
-            obstacleRadius = obstacleRadius,
-            obstacleMass = obstacleMass,
-            containerRadius = containerRadius
+            obstacleRadius = BigDecimal.valueOf(obstacleRadius),
+            obstacleMass = obstacleMass?.let { BigDecimal.valueOf(it) },
+            containerRadius = BigDecimal.valueOf(containerRadius)
         )
         val settings = Settings(
             generatorSettings = generatorSettings,
             outputFile = outputCsv,
             particles = ParticleGenerator(generatorSettings).generate(),
-            finalTime = finalTime,
+            finalTime = BigDecimal.valueOf(finalTime),
             internalCollisions = enableInternalCollisions,
             eventDensity = eventDensity
         )

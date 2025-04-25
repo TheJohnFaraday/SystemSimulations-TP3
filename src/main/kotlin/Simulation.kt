@@ -1,10 +1,13 @@
 package ar.edu.itba.ss
 
+import ch.obermuhlner.math.big.DefaultBigDecimalMath.createLocalMathContext
 import io.github.oshai.kotlinlogging.KotlinLogging
+import ch.obermuhlner.math.big.kotlin.bigdecimal.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.withContext
+import java.math.BigDecimal
 import java.util.*
 
 class Simulation(
@@ -14,7 +17,7 @@ class Simulation(
 ) {
     private val logger = KotlinLogging.logger {}
 
-    private var currentTime = 0.0
+    private var currentTime = BigDecimal.ZERO
     private var eventsCounter = 0
 
     /* The priority queue has the lowest t values first */
@@ -41,27 +44,43 @@ class Simulation(
         // First events
         eventsProcessor.calculateEventsTime(currentTime)
 
-        var debugEventsCounter = 0
-        while (eventQueue.isNotEmpty() && currentTime < settings.finalTime) {
-            val event = eventQueue.poll()
-            val p1 = particleMap[event.particle.id] ?: continue
+        createLocalMathContext(16).use {
+            while (eventQueue.isNotEmpty() && currentTime < settings.finalTime) {
+                val event = eventQueue.poll()
+                val p1 = particleMap[event.particle.id] ?: continue
 
-            if (!isValidEvent(p1, event)) continue
+                if (!isValidEvent(p1, event)) continue
 
-            val dt = event.time - currentTime
-            if (dt == 0.0) continue
+                val dt = event.time - currentTime
+                if (dt == BigDecimal.ZERO) continue
 
-            currentTime = event.time
-            // Advance all the particles (only position)
-            particleMap.replaceAll { _, p -> p.advance(dt) }
-            // Save current state to file
-            saveState()
-            // Update particle speed after collision
-            eventsProcessor.executeParticleCollision(p1, event)
+                currentTime = event.time
+                // Advance all the particles (only position)
+                particleMap.replaceAll { _, p -> p.advance(dt) }
 
-            eventQueue.clear()
-            eventsProcessor.calculateEventsTime(currentTime)
-            debugEventsCounter++
+//            if (event.type == CollisionType.WALL) {
+//                particleMap.replace(p1.id, CollisionUtils.fixWallCollision(settings, particleMap[p1.id]!!))
+//            } else
+                if (event.type == CollisionType.OBSTACLE) {
+                    var op1 = particleMap[p1.id]!!
+                    logger.info { "Hit obstacle! | t = $currentTime | id = ${op1.id} | particle = $op1" }
+//                      particleMap.replace(p1.id, CollisionUtils.fixObstacleCollision(settings, op1))
+                    val distanceToObstacle =
+                         op1.polarCoordinates.r - (op1.radius + settings.generatorSettings.obstacleRadius)
+
+                    logger.info { "distanceToObstacle = $distanceToObstacle | id = ${op1.id} | r = ${op1.polarCoordinates.r} | particle = $op1" }
+            }
+
+                // Save current state to file
+                saveState()
+                // Update particle speed after collision
+                val updatedP1 = particleMap[event.particle.id] ?: continue
+                eventsProcessor.executeParticleCollision(updatedP1, event)
+
+                eventQueue.clear()
+                eventsProcessor.calculateEventsTime(currentTime)
+            }
+
         }
 
         logger.info { "Finished" }
@@ -84,25 +103,25 @@ class Simulation(
             if (eventsCounter < eventDensity) {
                 eventsCounter++
 
-                if (eventQueue.size > 1 && currentTime > 0 && currentTime < settings.finalTime) {
+                if (eventQueue.size > 1 && currentTime > BigDecimal.ZERO && currentTime < settings.finalTime) {
                     return;
                 }
             }
         }
         particleMap.values.forEach { p ->
-
-            outputChannel.send(listOf(
+            val output = listOf(
                 "%.6f".format(currentTime),
                 p.id,
-                "%.8f".format(p.x),
-                "%.8f".format(p.y),
+                p.x,
+                p.y,
                 "%.8f".format(p.vx),
                 "%.8f".format(p.vy),
                 "%.8f".format(p.radius),
                 "%.8f".format(p.mass),
-                "%.8f".format(p.polarCoordinates.r),
+                p.polarCoordinates.r,
                 "%.8f".format(p.polarVelocity.normal)
-            ).joinToString(separator = ",", postfix = "\n"))
+            ).joinToString(separator = ",", postfix = "\n")
+            outputChannel.send(output)
         }
         eventsCounter = 0
     }

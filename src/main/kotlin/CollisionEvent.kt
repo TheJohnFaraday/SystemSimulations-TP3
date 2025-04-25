@@ -1,7 +1,9 @@
 package ar.edu.itba.ss
 
+import java.math.BigDecimal
+
 data class CollisionEvent(
-    val time: Double,
+    val time: BigDecimal,
     val particle: Particle,
     val type: CollisionType,
     val collisionCount: Int,

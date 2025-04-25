@@ -26,6 +26,10 @@ dependencies {
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
 
+    // BigMath
+    implementation ("ch.obermuhlner:big-math:2.3.2")
+    implementation ("ch.obermuhlner:kotlin-big-math:2.3.0")
+
     testImplementation(kotlin("test"))
 }
 

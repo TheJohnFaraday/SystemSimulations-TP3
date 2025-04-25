@@ -52,6 +52,7 @@ sns.set_style(PLT_THEME)
 DPI = 100
 FIGSIZE = (1920 / DPI, 1080 / DPI)
 
+
 # ------------------------------
 
 
@@ -142,46 +143,42 @@ def plot_pressure(pressure_df: pd.DataFrame, output_dir: str):
 
 def calculate_j(sim_params: SimulationParameters, snap: pd.DataFrame):
     hit_container = (snap["v_n"] > 0) & (
-        snap["r"] + snap["radius"] >= sim_params.r_container
+            sim_params.r_container - snap["r"] - snap["radius"] <= 1e-5
     )
+    obstacle_distance = snap["r"] - (snap["radius"] + sim_params.r_obstacle)
     hit_obstacle = (snap["v_n"] < 0) & (
-        snap["r"] - snap["radius"] <= sim_params.r_obstacle
+            obstacle_distance <= 1e-5
     )
     j_container = (2 * snap["m"] * np.abs(snap["v_n"][hit_container])).sum()
     j_obstacle = (2 * snap["m"] * np.abs(snap["v_n"][hit_obstacle])).sum()
     return {"container": j_container, "obstacle": j_obstacle}
 
 
-def calculate_pressure(sim_params: SimulationParameters, df: pd.DataFrame):
+def calculate_pressure(sim_params: SimulationParameters, df: pd.DataFrame, df_aux: pd.DataFrame):
     # P = J / (delta t * L)
+    DT_FIXED = 0.1
 
-    # sorted list of unique times in the file
-    times = np.sort(df.index.unique())
+    coll = df.join(df_aux[["type"]], how="inner")
 
-    # Δt_k  =  t_k  -  t_{k-1}   (Δt_0 is measured from t=0.0)
-    delta_t = np.diff(np.concatenate(([0.0], times)))
+    # J = 2 m |v_n|
+    coll["j"] = 2.0 * coll["m"] * coll["v_n"].abs()
 
-    records = []
-    for dt, t in zip(delta_t, times):
-        j = calculate_j(sim_params, df.loc[t])
+    times = coll.index.get_level_values(0).to_numpy()
+    coll["bin_id"] = np.floor_divide(times, DT_FIXED).astype(int)
 
-        P_cont = j["container"] / (dt * sim_params.perimeter_container)  # Pa
-        P_obs = j["obstacle"] / (dt * sim_params.perimeter_obstacle)  # Pa
+    j_sum = coll.groupby(["bin_id", "type"], sort=True)["j"].sum().unstack(fill_value=0.0)
+    j_sum = j_sum.reindex(columns=["WALL", "OBSTACLE"], fill_value=0.0)
 
-        # Skip times without pressure
-        # if P_cont == 0.0 and P_obs == 0.0:
-        #     continue
-
-        records.append(
-            {
-                "time": t,
-                "pressure_container": P_cont,
-                "pressure_obstacle": P_obs,
-            }
-        )
-
-    pressure_df = pd.DataFrame.from_records(records).set_index("time").sort_index()
-    return pressure_df
+    P_cont = j_sum["WALL"] / (DT_FIXED * sim_params.perimeter_container)  # Pa
+    P_obs = j_sum["OBSTACLE"] / (DT_FIXED * sim_params.perimeter_obstacle)  # Pa
+    return pd.DataFrame(
+        {
+            # "time": t,
+            "time": j_sum.index * DT_FIXED,
+            "pressure_container": P_cont,
+            "pressure_obstacle": P_obs,
+        }
+    ).set_index("time").sort_index()
 
 
 def read_csv(filepath: str):
@@ -207,7 +204,16 @@ def read_csv(filepath: str):
     )
     df.set_index("time", inplace=True)
 
-    return config, df
+    df_aux = pd.read_csv(
+        filepath + "_clone",
+        sep=",",  # separator (default is comma)
+        header=0,  # use first row as header
+        index_col=None,  # don't use any column as index
+        skiprows=0,  # number of rows to skip
+    )
+    df_aux.set_index("time", inplace=True)
+
+    return config, df, df_aux
 
 
 def main(output_file: str, fixed_obstacle: bool):
@@ -215,24 +221,13 @@ def main(output_file: str, fixed_obstacle: bool):
     output_base_dir = "./analysis"
     os.makedirs(output_base_dir, exist_ok=True)
 
-    simulation_params, df = read_csv(f"{input_dir}/{output_file}")
+    simulation_params, df, df_aux = read_csv(f"{input_dir}/{output_file}")
     print(df)
+    print(df_aux)
 
-    pressure_df = calculate_pressure(simulation_params, df)
+    pressure_df = calculate_pressure(simulation_params, df, df_aux)
     plot_pressure(pressure_df, output_base_dir)
     print(pressure_df.head())
-
-    count_hits = 0
-    count_assisted_hits = 0
-    for index, row in df.iterrows():
-        vn = row["v_n"] < 0
-        len_val = row["r"] - row["radius"] - simulation_params.r_obstacle
-        hit = len_val <= 0.0
-        if hit:
-            count_hits += 1
-        elif vn and len_val < 1e-5:
-            count_assisted_hits += 1
-    print(f"{count_hits = }\t{count_assisted_hits = }")
 
 
 if __name__ == "__main__":

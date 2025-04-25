@@ -13,6 +13,7 @@ import java.util.*
 class Simulation(
     private val settings: Settings,
     private val outputChannel: Channel<String>,
+    private val outputChannelClone: Channel<String>,
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
     private val logger = KotlinLogging.logger {}
@@ -40,6 +41,7 @@ class Simulation(
 
         // Header
         outputChannel.send("time,id,x,y,vx,vy,radius,m,r,v_n\n")
+        outputChannelClone.send("time,type,d_obstacle,d_wall\n")
 
         // First events
         eventsProcessor.calculateEventsTime(currentTime)
@@ -58,23 +60,11 @@ class Simulation(
                 // Advance all the particles (only position)
                 particleMap.replaceAll { _, p -> p.advance(dt) }
 
-//            if (event.type == CollisionType.WALL) {
-//                particleMap.replace(p1.id, CollisionUtils.fixWallCollision(settings, particleMap[p1.id]!!))
-//            } else
-                if (event.type == CollisionType.OBSTACLE) {
-                    var op1 = particleMap[p1.id]!!
-                    logger.info { "Hit obstacle! | t = $currentTime | id = ${op1.id} | particle = $op1" }
-//                      particleMap.replace(p1.id, CollisionUtils.fixObstacleCollision(settings, op1))
-                    val distanceToObstacle =
-                         op1.polarCoordinates.r - (op1.radius + settings.generatorSettings.obstacleRadius)
-
-                    logger.info { "distanceToObstacle = $distanceToObstacle | id = ${op1.id} | r = ${op1.polarCoordinates.r} | particle = $op1" }
-            }
-
                 // Save current state to file
                 saveState()
                 // Update particle speed after collision
                 val updatedP1 = particleMap[event.particle.id] ?: continue
+                cloneState(event, updatedP1)
                 eventsProcessor.executeParticleCollision(updatedP1, event)
 
                 eventQueue.clear()
@@ -110,7 +100,7 @@ class Simulation(
         }
         particleMap.values.forEach { p ->
             val output = listOf(
-                "%.6f".format(currentTime),
+                "%.8f".format(currentTime),
                 p.id,
                 p.x,
                 p.y,
@@ -124,5 +114,20 @@ class Simulation(
             outputChannel.send(output)
         }
         eventsCounter = 0
+    }
+
+    private suspend fun cloneState(event: CollisionEvent, particle: Particle) {
+    val distanceToObstacle =
+         particle.polarCoordinates.r - (particle.radius + settings.generatorSettings.obstacleRadius)
+        val distanceToWall =
+            settings.generatorSettings.containerRadius - (particle.polarCoordinates.r + particle.radius)
+
+        val output = listOf(
+            "%.8f".format(currentTime),
+            event.type,
+            distanceToObstacle,
+            distanceToWall
+        ).joinToString(separator = ",", postfix = "\n")
+        outputChannelClone.send(output)
     }
 }

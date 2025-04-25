@@ -119,6 +119,7 @@ class Cli : CliktCommand() {
         }.replace(".", "_").replace("=", "-") + ".csv"
 
         val outputCsv = outputDirectory.resolve(fileName).toFile()
+        val outputCloneCsv = outputDirectory.resolve(fileName + "_clone").toFile()
 
         val generatorSettings = GeneratorSettings(
             random = Random(seed),
@@ -134,6 +135,7 @@ class Cli : CliktCommand() {
         val settings = Settings(
             generatorSettings = generatorSettings,
             outputFile = outputCsv,
+            outputFile2 = outputCloneCsv,
             particles = ParticleGenerator(generatorSettings).generate(),
             finalTime = BigDecimal.valueOf(finalTime),
             internalCollisions = enableInternalCollisions,
@@ -142,10 +144,13 @@ class Cli : CliktCommand() {
 
         runBlocking {
             val writeOutputChannel = Channel<String>(capacity = Channel.UNLIMITED)
+            val writeOutputChannelClone = Channel<String>(capacity = Channel.UNLIMITED)
             val writer = OutputWriter(settings = settings, channel = writeOutputChannel)
-            val simulation = Simulation(settings, outputChannel = writeOutputChannel)
+            val writerClone = OutputWriterClone(settings = settings, channel = writeOutputChannelClone)
+            val simulation = Simulation(settings, outputChannel = writeOutputChannel, outputChannelClone = writeOutputChannelClone)
 
             val writerJob = launch { writer.start() }
+            val writerCloneJob = launch { writerClone.start() }
             val simulationJob = launch { simulation.simulate() }
 
             simulationJob.join()
@@ -153,6 +158,8 @@ class Cli : CliktCommand() {
 
             writer.requestStop()
             writerJob.join()
+            writerClone.requestStop()
+            writerCloneJob.join()
             writeOutputChannel.close()
 
             logger.info { "Simulation completed. Output saved to $outputCsv" }

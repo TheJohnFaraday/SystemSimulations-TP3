@@ -1,6 +1,5 @@
 package ar.edu.itba.ss
 
-import ch.obermuhlner.math.big.DefaultBigDecimalMath
 import ch.obermuhlner.math.big.DefaultBigDecimalMath.*
 import ch.obermuhlner.math.big.kotlin.bigdecimal.*
 import java.math.BigDecimal
@@ -80,12 +79,13 @@ data class Particle(
         return PolarVelocity(normal = vn, tangential = vt)
     }
 
-    private fun toPolar(): PolarCoordinates {
-        return PolarCoordinates(
+    private fun toPolar(): PolarCoordinates =
+        if (x == BigDecimal.ZERO && y == BigDecimal.ZERO)
+            PolarCoordinates(BigDecimal.ZERO, BigDecimal.ZERO)
+        else PolarCoordinates(
             r = sqrt(x * x + y * y),
             angle = atan2(y, x)
         )
-    }
 
     override fun toString(): String {
         return "Particle(id=$id, position=($x, $y), radius=$radius, mass=$mass, velocity=(vx=$vx, vy=$vy))"

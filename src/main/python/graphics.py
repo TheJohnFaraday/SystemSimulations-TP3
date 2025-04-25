@@ -143,6 +143,22 @@ def plot_pressure(pressure_df: pd.DataFrame, output_dir: str):
     plt.close()
 
 
+def plot_collisions_with_obstacle(simulation_params: SimulationParameters, df: pd.DataFrame, first_time_hits: pd.Series,
+                                  all_hits: pd.Series, output_dir: str):
+    unified_plot_df = pd.concat([first_time_hits.rename("Primera vez"), all_hits.rename("Todas las colisiones")],
+                                axis=1).fillna(0)
+
+    plt.figure(figsize=FIGSIZE)
+    sns.lineplot(data=unified_plot_df, markers=True    )
+    plt.xlabel("Tiempo (s)", fontsize=14)
+    plt.ylabel("Cantidad de colisiones", fontsize=14)
+    plt.grid(True)
+    # plt.show()
+    plt.savefig(f"./{output_dir}/collissions_with_obstacle" ".png")
+    plt.clf()
+    plt.close()
+
+
 def classify_collision(df: pd.DataFrame, sim: SimulationParameters, tol: float = 1e-5):
     """
     Returns a Series indexed exactly like `df` with values:
@@ -164,9 +180,6 @@ def classify_collision(df: pd.DataFrame, sim: SimulationParameters, tol: float =
 
 def calculate_pressure(sim_params: SimulationParameters, df: pd.DataFrame):
     # P = J / (delta t * L)
-
-    df = df.copy()
-    df["type"] = classify_collision(df, sim_params)
     coll = df.dropna(subset=["type"]).copy()
 
     # J = 2 m |v_n|
@@ -196,7 +209,60 @@ def calculate_pressure(sim_params: SimulationParameters, df: pd.DataFrame):
         )
         .set_index("time")
         .sort_index()
+        .iloc[:-1]
     )
+
+
+def calculate_first_time_collisions(df: pd.DataFrame):
+    # Keep only "OBSTACLE" collisions
+    obs = df[df["type"] == "OBSTACLE"]
+    if obs.empty:
+        return pd.Series(dtype=int)
+
+    # Keep first collision only. One row per id
+    first_hit = obs.sort_values("time").groupby("id", sort=False).head(1)
+
+    # time slices
+    t = first_hit.index.get_level_values(0).to_numpy()
+    bin_id = np.floor_divide(t, DT_FIXED).astype(int)
+    first_hit = first_hit.copy()
+    first_hit["bin_id"] = bin_id
+
+    # count
+    counts = first_hit.groupby("bin_id").size().rename("n_first_hits")
+    counts.index = counts.index * DT_FIXED
+    counts.index.name = "time"
+
+    return counts
+
+
+def calculate_all_obstacle_collisions(df: pd.DataFrame):
+    # Keep only "OBSTACLE" collisions
+    obs = df[df["type"] == "OBSTACLE"]
+    if obs.empty:
+        return pd.Series(dtype=int)
+
+    # time slices
+    t = obs.index.get_level_values(0).to_numpy()
+    bin_id = np.floor_divide(t, DT_FIXED).astype(int)
+
+    # count
+    counts = pd.Series(bin_id).value_counts(sort=False).rename_axis("bin_id").sort_index().rename("n_hits")
+    counts.index = counts.index * DT_FIXED
+    counts.index.name = "time"
+
+    return counts
+
+
+def calculate_collisions_with_obstacle(sim_params: SimulationParameters, df: pd.DataFrame):
+    coll = df.dropna(subset=["type"]).copy()
+    first_time = calculate_first_time_collisions(coll)
+    print(first_time)
+
+    all_hits = calculate_all_obstacle_collisions(coll)
+    print(all_hits)
+
+    return first_time, all_hits
 
 
 def read_csv(filepath: str):
@@ -233,9 +299,14 @@ def main(output_file: str, fixed_obstacle: bool):
     simulation_params, df = read_csv(f"{input_dir}/{output_file}")
     print(df)
 
+    df["type"] = classify_collision(df, simulation_params)
+
     pressure_df = calculate_pressure(simulation_params, df)
     plot_pressure(pressure_df, output_base_dir)
     print(pressure_df.head())
+
+    first_time_hits, all_hits = calculate_collisions_with_obstacle(simulation_params, df)
+    plot_collisions_with_obstacle(simulation_params, df, first_time_hits, all_hits, output_dir=output_base_dir)
 
 
 if __name__ == "__main__":
